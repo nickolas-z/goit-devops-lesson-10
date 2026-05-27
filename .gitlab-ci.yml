@@ -1,0 +1,13 @@
+stages:
+  - train
+
+train-model:
+  stage: train
+  image: amazon/aws-cli:2.15.0
+  script:
+    - aws stepfunctions start-execution
+        --state-machine-arn "$STATE_MACHINE_ARN"
+        --name "train-$(date +%s)"
+        --input '{"source":"gitlab-ci","commit":"'"$CI_COMMIT_SHORT_SHA"'"}'
+  only:
+    - pushes
