@@ -1,7 +1,6 @@
 stages:
   - train
 
-# Same AWS region as in previous GoIT Terraform projects.
 variables:
   AWS_DEFAULT_REGION: "us-east-1"
 

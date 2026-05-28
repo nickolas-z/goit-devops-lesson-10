@@ -1,10 +1,10 @@
 # Lesson 10 — MLOps Train Automation
 
-Автоматизація тренування моделей через AWS Step Functions + Lambda, розгорнута через Terraform з інтеграцією GitLab CI.
+Автоматизація тренування моделей через AWS Step Functions + Lambda, розгорнута через Terraform з інтеграцією GitHub Actions.
 
 ## Конфігурація за замовчуванням
 
-AWS-налаштування взяті з попередніх GoIT DevOps проєктів: локальний Terraform використовує профіль `devops` з `~/.aws/config` / `~/.aws/credentials`, а регіон — `us-east-1`. Значення `AWS_ACCESS_KEY_ID` та `AWS_SECRET_ACCESS_KEY` не зберігаються в репозиторії; для GitLab CI їх потрібно додати як masked/protected CI variables з того самого AWS профілю.
+AWS-налаштування взяті з попередніх GoIT DevOps проєктів: локальний Terraform використовує профіль `devops` з `~/.aws/config` / `~/.aws/credentials`, а регіон — `us-east-1`. Значення `AWS_ACCESS_KEY_ID` та `AWS_SECRET_ACCESS_KEY` не зберігаються в репозиторії; для GitHub Actions їх потрібно додати як repository secrets з того самого AWS профілю.
 
 | Параметр | Значення |
 | --- | --- |
@@ -18,13 +18,13 @@ AWS-налаштування взяті з попередніх GoIT DevOps пр
 ## Архітектура
 
 ```text
-GitLab CI (push) → aws stepfunctions start-execution
-                          ↓
-              Step Function: mlops-train-pipeline
-                          ↓
-              Step 1: ValidateData  (Lambda: mlops-validate)
-                          ↓
-              Step 2: LogMetrics    (Lambda: mlops-log-metrics)
+GitHub Actions (push) -> aws stepfunctions start-execution
+                                  ↓
+                      Step Function: mlops-train-pipeline
+                                  ↓
+                      Step 1: ValidateData  (Lambda: mlops-validate)
+                                  ↓
+                      Step 2: LogMetrics    (Lambda: mlops-log-metrics)
 ```
 
 ## Структура проєкту
@@ -39,7 +39,9 @@ mlops-train-automation/
 │       ├── log_metrics.py
 │       ├── validate.zip
 │       └── log_metrics.zip
-├── .gitlab-ci.yml
+├── .github/
+│   └── workflows/
+│       └── train-model.yml
 └── README.md
 ```
 
@@ -52,7 +54,7 @@ mlops-train-automation/
 | Python | >= 3.12 |
 | zip | будь-яка |
 
-## 1. Зібрати Lambda-архіви
+## Зібрати Lambda-архіви
 
 ```bash
 cd terraform/lambda
@@ -60,7 +62,7 @@ zip validate.zip validate.py
 zip log_metrics.zip log_metrics.py
 ```
 
-## 2. Розгорнути інфраструктуру через Terraform
+## Розгорнути інфраструктуру через Terraform
 
 ```bash
 cd terraform
@@ -78,11 +80,11 @@ Terraform створить:
 Після завершення `terraform apply` виведе ARN стейт-машини:
 
 ```text
-Outputs:
-state_machine_arn = "arn:aws:states:us-east-1:123456789012:stateMachine:mlops-train-pipeline"
+Real outputs:
+state_machine_arn = "arn:aws:states:us-east-1:716145798329:stateMachine:mlops-train-pipeline"
 ```
 
-## 3. Вручну перевірити Step Function через AWS Console
+## Вручну перевірити Step Function через AWS Console
 
 1. Відкрити [AWS Console → Step Functions](https://console.aws.amazon.com/states/)
 2. Знайти `mlops-train-pipeline`
@@ -96,37 +98,39 @@ state_machine_arn = "arn:aws:states:us-east-1:123456789012:stateMachine:mlops-tr
 }
 ```
 
-1. Перевірити, що обидва стани (`ValidateData` та `LogMetrics`) виконались зі статусом **Succeeded**
-1. Логи Lambda доступні в **CloudWatch Logs** → `/aws/lambda/mlops-validate` та `/aws/lambda/mlops-log-metrics`
+5. Перевірити, що обидва стани (`ValidateData` та `LogMetrics`) виконались зі статусом **Succeeded**
+6. Логи Lambda доступні в **CloudWatch Logs** → `/aws/lambda/mlops-validate` та `/aws/lambda/mlops-log-metrics`
+![](./img/mlops-train-pipeline.png)
+## 4. GitHub Actions
 
-## 4. GitLab CI
+### Як працює workflow
 
-### Як працює job
+Файл `.github/workflows/train-model.yml` містить workflow `Train Model`. При кожному `push` до GitHub репозиторію:
 
-Файл `.gitlab-ci.yml` містить один job `train-model` на стадії `train`. При кожному `push` до репозиторію GitLab CI:
+1. Запускає job `train-model` на `ubuntu-latest`
+2. Налаштовує AWS credentials через `aws-actions/configure-aws-credentials@v4`
+3. Виконує `aws stepfunctions start-execution` з унікальним іменем `train-<short-sha>-<timestamp>`
+4. Передає JSON з джерелом та SHA коміту
 
-1. Запускає контейнер `amazon/aws-cli:2.15.0`
-2. Виконує `aws stepfunctions start-execution` з унікальним іменем `train-<timestamp>`
-3. Передає JSON з джерелом та SHA коміту
-
-### Необхідні змінні в GitLab CI Settings
+### Необхідні GitHub Secrets
 
 | Змінна | Значення |
 | --- | --- |
 | `AWS_ACCESS_KEY_ID` | Access key з локального AWS профілю `devops` |
 | `AWS_SECRET_ACCESS_KEY` | Secret key з локального AWS профілю `devops` |
-| `AWS_DEFAULT_REGION` | `us-east-1` (також задано у `.gitlab-ci.yml`) |
 | `STATE_MACHINE_ARN` | ARN з виводу `terraform apply` |
 
-Додати через: **Settings → CI/CD → Variables**
+Додати через: **Settings -> Secrets and variables -> Actions -> New repository secret**
 
-### Приклад JSON, що передається через CI
+`AWS_DEFAULT_REGION` задано напряму у workflow як `us-east-1`.
+
+### Приклад JSON, що передається через GitHub Actions
 
 ```json
 {
-  "source": "gitlab-ci",
+  "source": "github-actions",
   "commit": "a1b2c3d4"
 }
 ```
 
-де `commit` — значення змінної `$CI_COMMIT_SHORT_SHA` (перші 8 символів SHA коміту).
+де `commit` — перші 8 символів значення `$GITHUB_SHA`.

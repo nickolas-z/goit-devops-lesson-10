@@ -1,0 +1,33 @@
+name: Train Model
+
+on: push
+
+env:
+  AWS_DEFAULT_REGION: us-east-1
+
+permissions:
+  contents: read
+
+jobs:
+  train-model:
+    name: Start Step Function
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_DEFAULT_REGION }}
+
+      - name: Start training pipeline
+        env:
+          STATE_MACHINE_ARN: ${{ secrets.STATE_MACHINE_ARN }}
+        run: |
+          SHORT_SHA="${GITHUB_SHA::8}"
+
+          aws stepfunctions start-execution \
+            --state-machine-arn "$STATE_MACHINE_ARN" \
+            --name "train-${SHORT_SHA}-$(date +%s)" \
+            --input "{\"source\":\"github-actions\",\"commit\":\"${SHORT_SHA}\"}"
