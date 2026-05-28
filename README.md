@@ -4,6 +4,8 @@
 
 ## Конфігурація за замовчуванням
 
+AWS-налаштування взяті з попередніх GoIT DevOps проєктів: локальний Terraform використовує профіль `devops` з `~/.aws/config` / `~/.aws/credentials`, а регіон — `us-east-1`. Значення `AWS_ACCESS_KEY_ID` та `AWS_SECRET_ACCESS_KEY` не зберігаються в репозиторії; для GitLab CI їх потрібно додати як masked/protected CI variables з того самого AWS профілю.
+
 | Параметр | Значення |
 | --- | --- |
 | AWS Region | `us-east-1` |
@@ -111,9 +113,9 @@ state_machine_arn = "arn:aws:states:us-east-1:123456789012:stateMachine:mlops-tr
 
 | Змінна | Значення |
 | --- | --- |
-| `AWS_ACCESS_KEY_ID` | AWS Access Key |
-| `AWS_SECRET_ACCESS_KEY` | AWS Secret Key |
-| `AWS_DEFAULT_REGION` | `us-east-1` |
+| `AWS_ACCESS_KEY_ID` | Access key з локального AWS профілю `devops` |
+| `AWS_SECRET_ACCESS_KEY` | Secret key з локального AWS профілю `devops` |
+| `AWS_DEFAULT_REGION` | `us-east-1` (також задано у `.gitlab-ci.yml`) |
 | `STATE_MACHINE_ARN` | ARN з виводу `terraform apply` |
 
 Додати через: **Settings → CI/CD → Variables**

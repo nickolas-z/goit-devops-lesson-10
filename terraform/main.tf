@@ -59,8 +59,8 @@ resource "aws_iam_role_policy" "step_function_lambda_policy" {
     Version = "2012-10-17"
     Statement = [
       {
-        Effect   = "Allow"
-        Action   = ["lambda:InvokeFunction"]
+        Effect = "Allow"
+        Action = ["lambda:InvokeFunction"]
         Resource = [
           aws_lambda_function.validate.arn,
           aws_lambda_function.log_metrics.arn,
